@@ -1,10 +1,11 @@
 import fs from "fs"
 import path from "path"
-import unzipper from "unzipper"
+import AdmZip from "adm-zip"
 import mime from "mime-types"
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { S3SyncClient } from "s3-sync-client"
 import { CloudFrontClient, CreateInvalidationCommand, GetInvalidationCommand } from "@aws-sdk/client-cloudfront"
+import { glob } from "glob"
 
 export async function handler(event) {
 	try {
@@ -68,11 +69,10 @@ async function deploy(event) {
 				await fs.promises.writeFile(path.join(localAssetPath, asset.s3ObjectKey), zipBody)
 
 				console.log(`Unzipping ${path.join(localAssetPath, asset.s3ObjectKey)} to ${path.join(localAssetPath, "unzipped")}...`)
-				await unzip(path.join(localAssetPath, asset.s3ObjectKey), path.join(localAssetPath, "unzipped"))
+				const admZip = new AdmZip(path.join(localAssetPath, asset.s3ObjectKey))
+				admZip.extractAllTo(path.join(localAssetPath, "unzipped"))
 				await fs.promises.rm(path.join(localAssetPath, asset.s3ObjectKey), { recursive: true })
-				const files = (await fs.promises.readdir(path.join(localAssetPath, "unzipped"), { recursive: true, withFileTypes: true }))
-					.filter(file => !file.isDirectory())
-					.map(file => file.name)
+				const files = await glob("**/*", { cwd: path.join(localAssetPath, "unzipped"), nodir: true })
 
 				console.log(`Moving ${path.join(localAssetPath, "unzipped")} to ${finalPath}...`)
 				await fs.promises.cp(path.join(localAssetPath, "unzipped"), finalPath, { recursive: true })
@@ -133,15 +133,6 @@ async function deploy(event) {
 			}
 		}
 	}))
-}
-
-async function unzip(source, destination) {
-	return new Promise((resolve, reject) => {
-		fs.createReadStream(source)
-			.pipe(unzipper.Extract({ path: destination }))
-			.on("close", () => resolve())
-			.on("error", error => reject(error))
-	})
 }
 
 function getFrequencies(list) {
