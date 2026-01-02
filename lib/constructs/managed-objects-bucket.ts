@@ -127,7 +127,7 @@ export class ManagedObjectsBucket extends s3.Bucket {
 		}))
 
 		const handler = new lambda.Function(this, "ObjectManagerFunction", {
-			runtime: lambda.Runtime.NODEJS_20_X,
+			runtime: lambda.Runtime.NODEJS_24_X,
 			role: this.#handlerRole,
 			code: lambda.Code.fromAsset(codePackagePath),
 			handler: "index.handler",
